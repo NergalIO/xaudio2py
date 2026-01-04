@@ -23,10 +23,6 @@ classifiers = [
     "Topic :: Multimedia :: Sound/Audio",
 ]
 
-dependencies = [
-    "rich>=13.0.0",
-]
-
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0.0",
