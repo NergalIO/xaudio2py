@@ -1,345 +1,662 @@
-# xaudio2py
+# 🎵 xaudio2py
 
-Python wrapper for XAudio2 using ctypes. Provides a high-level API for audio playback on Windows with support for WAV files, multiple simultaneous playbacks, volume control, panning, and looping.
+Python обёртка для Microsoft XAudio2 на базе ctypes. Предоставляет высокоуровневый API для воспроизведения аудио на Windows с поддержкой WAV-файлов, множественных одновременных воспроизведений, управления громкостью, панорамированием и зацикливанием.
 
-## Requirements
+---
 
-- Python 3.11+
-- Windows 10/11
-- XAudio2 DLL (see installation section)
+## 📋 Требования
 
-## Installation
+- **Python**: 3.11 или выше
+- **ОС**: Windows 10/11
+- **XAudio2 DLL**: `xaudio2_9redist.dll` (см. раздел установки)
 
-1. Clone or download this repository.
+---
 
-2. Install the package:
+## 🚀 Установка
+
+### Шаг 1: Клонирование репозитория
+
+```bash
+git clone <repository-url>
+cd audio
+```
+
+### Шаг 2: Установка пакета
+
 ```bash
 pip install -e .
 ```
 
-3. Ensure `xaudio2_9redist.dll` is available:
-   - Place `xaudio2_9redist.dll` in the `bin/` directory of the project
-   - Or place it in the same directory as your Python script
-   - Or ensure it's in your system PATH
+### Шаг 3: Настройка XAudio2 DLL
 
-### Как проверить наличие xaudio2_9redist.dll
+Убедитесь, что `xaudio2_9redist.dll` доступна в одном из следующих мест:
 
-Вы можете проверить наличие DLL следующими способами:
+- ✅ Директория `bin/` проекта
+- ✅ Текущая рабочая директория
+- ✅ Директория Python-интерпретатора
+- ✅ Системные директории (`C:\Windows\System32` или `C:\Windows\SysWOW64`)
+- ✅ Системный PATH
 
-1. **Проверка в bin/ директории:**
+#### Проверка наличия DLL
+
+**Проверка в bin/ директории:**
 ```bash
 dir bin\xaudio2_9redist.dll
 ```
 
-2. **Проверка через Python:**
+**Проверка через Python:**
 ```python
 from pathlib import Path
 dll_path = Path("bin/xaudio2_9redist.dll")
 if dll_path.exists():
-    print(f"DLL found at: {dll_path.absolute()}")
+    print(f"✅ DLL found at: {dll_path.absolute()}")
 else:
-    print("DLL not found in bin/")
+    print("❌ DLL not found in bin/")
 ```
 
-3. **Проверка в системных директориях:**
+**Проверка в системных директориях:**
 ```bash
 dir C:\Windows\System32\xaudio2_9redist.dll
 dir C:\Windows\SysWOW64\xaudio2_9redist.dll
 ```
 
-4. **Использование dumpbin (если установлен Visual Studio):**
-```bash
-dumpbin /exports bin\xaudio2_9redist.dll
-```
+#### Порядок поиска DLL
 
-DLL loader автоматически ищет DLL в следующем порядке:
-1. Текущая директория
-2. `bin/` директория проекта
-3. Директория Python
-4. `C:\Windows\System32`
-5. `C:\Windows\SysWOW64`
-6. Системный PATH
+Загрузчик DLL ищет библиотеку в следующем порядке:
 
-Если `xaudio2_9redist.dll` не найден, будет предпринята попытка загрузить `xaudio2_9.dll`, `xaudio2_8.dll`, или `xaudio2_7.dll` в указанном порядке.
+1. 📁 Текущая директория
+2. 📁 `bin/` директория проекта
+3. 📁 Директория Python-интерпретатора
+4. 📁 `C:\Windows\System32`
+5. 📁 `C:\Windows\SysWOW64`
+6. 📁 Пути из системного PATH
 
-## Quick Start
+**Резервные варианты:**
+
+Если `xaudio2_9redist.dll` не найден, автоматически выполняется попытка загрузить:
+- `xaudio2_9.dll`
+- `xaudio2_8.dll`
+- `xaudio2_7.dll`
+
+---
+
+## 🎯 Быстрый старт
+
+### Базовый пример
 
 ```python
 from xaudio2py import AudioEngine
 
-# Create and start engine
+# Создание и запуск движка
 engine = AudioEngine()
 engine.start()
 
-# Load a WAV file
+# Загрузка WAV-файла
 sound = engine.load_wav("music.wav")
 
-# Play the sound
+# Воспроизведение
 handle = engine.play(sound)
 
-# Control playback
-engine.pause(handle)
-engine.resume(handle)
-engine.set_volume(handle, 0.5)
-engine.set_pan(handle, -0.5)  # Pan left
+# Управление воспроизведением
+engine.pause(handle)      # Пауза
+engine.resume(handle)     # Продолжить
+engine.set_volume(handle, 0.5)  # Громкость 50%
+engine.set_pan(handle, -0.5)    # Панорама влево
 
-# Stop playback
+# Остановка
 engine.stop(handle)
 
-# Shutdown
+# Завершение работы
 engine.shutdown()
 ```
 
-Or use as a context manager:
+### Использование контекстного менеджера
 
 ```python
 with AudioEngine() as engine:
     sound = engine.load_wav("music.wav")
-    handle = engine.play(sound, loop=True)
-    # ... do something ...
+    handle = engine.play(sound, loop=True, volume=0.8)
+    # Движок автоматически закроется при выходе из блока
 ```
 
-## API Reference
+---
 
-### AudioEngine
+## 📚 API Справочник
 
-Main facade class for audio operations.
+### 🎛️ AudioEngine
 
-#### Methods
+Основной класс для работы с аудио.
 
-- `start()` - Start the audio engine (must be called before playing sounds)
-- `shutdown()` - Shutdown the engine and free all resources
-- `load_wav(path: str) -> Sound` - Load a WAV file
-- `play(sound: Sound, *, volume=1.0, pan=0.0, loop=False) -> PlaybackHandle` - Start playback
-- `stop(handle: PlaybackHandle)` - Stop playback
-- `pause(handle: PlaybackHandle)` - Pause playback
-- `resume(handle: PlaybackHandle)` - Resume playback
-- `set_volume(handle: PlaybackHandle, volume: float)` - Set volume (0.0 to 1.0)
-- `set_pan(handle: PlaybackHandle, pan: float)` - Set pan (-1.0 left, 0.0 center, 1.0 right)
-- `set_master_volume(volume: float)` - Set master volume (0.0 to 1.0)
-- `is_playing(handle: PlaybackHandle) -> bool` - Check if playback is active
+#### Методы
 
-### Sound
+| Метод | Описание | Параметры | Возвращает |
+|-------|----------|-----------|------------|
+| `start()` | Запускает аудио-движок | — | `None` |
+| `shutdown()` | Останавливает движок и освобождает ресурсы | — | `None` |
+| `load_wav(path)` | Загружает WAV-файл | `path: str` | `Sound` |
+| `play(sound, **)` | Начинает воспроизведение | `sound`, `volume=1.0`, `pan=0.0`, `loop=False` | `PlaybackHandle` |
+| `stop(handle)` | Останавливает воспроизведение | `handle: PlaybackHandle` | `None` |
+| `pause(handle)` | Ставит на паузу | `handle: PlaybackHandle` | `None` |
+| `resume(handle)` | Снимает с паузы | `handle: PlaybackHandle` | `None` |
+| `set_volume(handle, vol)` | Устанавливает громкость | `handle`, `volume: float (0.0-1.0)` | `None` |
+| `set_pan(handle, pan)` | Устанавливает панораму | `handle`, `pan: float (-1.0 до 1.0)` | `None` |
+| `set_master_volume(vol)` | Устанавливает общую громкость | `volume: float (0.0-1.0)` | `None` |
+| `is_playing(handle)` | Проверяет статус воспроизведения | `handle: PlaybackHandle` | `bool` |
 
-Represents a loaded audio file.
+#### Параметры воспроизведения
 
-#### Properties
+- **volume** (float): Громкость от `0.0` (тишина) до `1.0` (максимум). По умолчанию: `1.0`
+- **pan** (float): Панорама от `-1.0` (влево) через `0.0` (центр) до `1.0` (вправо). По умолчанию: `0.0`
+- **loop** (bool): Зацикливание воспроизведения. По умолчанию: `False`
 
-- `data: SoundData` - Audio data and format
-- `path: str` - Source file path
-- `duration: float` - Duration in seconds
+---
 
-### PlaybackHandle
+### 🎵 Sound
 
-Handle for controlling a playback instance.
+Объект загруженного аудио-файла.
 
-## Supported Audio Formats
+#### Свойства
 
-Currently supported WAV formats:
-- **Format**: PCM (fmt=1)
-- **Bit depth**: 16-bit
-- **Channels**: Mono (1) or Stereo (2)
-- **Sample rates**: 44100 Hz or 48000 Hz
+- `data: SoundData` — Аудио-данные и формат
+- `path: str` — Путь к исходному файлу
+- `duration: float` — Длительность в секундах
 
-Other formats will raise `InvalidAudioFormat` with a descriptive error message.
-
-## Architecture
-
-### SOLID Principles
-
-The project follows SOLID principles:
-
-#### Single Responsibility Principle (SRP)
-- **WAV parser** (`formats/wav.py`) - Only responsible for parsing WAV files
-- **Backend** (`backends/`) - Only responsible for XAudio2 operations
-- **Engine** (`api/engine.py`) - Only responsible for high-level API and coordination
-- **Worker thread** (`core/thread.py`) - Only responsible for command dispatch
-
-#### Open/Closed Principle (OCP)
-- **IAudioBackend protocol** allows replacing the backend implementation without modifying core code
-- New backends can be added by implementing the `IAudioBackend` interface
-- Example: `NullBackend` for testing, `XAudio2Backend` for production
-
-#### Liskov Substitution Principle (LSP)
-- All backend implementations are interchangeable through the `IAudioBackend` protocol
-- `NullBackend` and `XAudio2Backend` can be used interchangeably
-
-#### Interface Segregation Principle (ISP)
-- Small, focused protocols: `IAudioBackend`, `IVoice`, `IBackendWorker`
-- No "god interfaces" - each interface has a specific purpose
-
-#### Dependency Inversion Principle (DIP)
-- `AudioEngine` depends on `IAudioBackend` protocol, not concrete implementations
-- Core modules depend on abstractions (Protocols, models), not ctypes/XAudio2 directly
-
-### Thread Safety
-
-**Почему выбран worker thread:**
-
-1. **COM Requirements**: XAudio2 is a COM-based API. COM requires that all calls to a COM object are made from the same thread where it was created (apartment threading model). By using a dedicated worker thread with `COINIT_MULTITHREADED`, we ensure all XAudio2 operations happen in one thread.
-
-2. **Thread Safety**: The public API (`AudioEngine` methods) is thread-safe and can be called from any thread. Commands are queued and executed in the worker thread, preventing race conditions.
-
-3. **Blocking Operations**: Some XAudio2 operations may block. Isolating them in a worker thread prevents blocking the main application thread.
-
-4. **Resource Management**: Centralized resource management in one thread simplifies cleanup and prevents resource leaks.
-
-All public API methods are thread-safe. Commands to the backend are executed asynchronously in a worker thread via a queue-based system.
-
-### Backend Abstraction
-
-The backend is abstracted through the `IAudioBackend` protocol:
+#### Пример
 
 ```python
-class IAudioBackend(Protocol):
-    def initialize(self) -> None: ...
-    def create_source_voice(...) -> IVoice: ...
-    def set_master_volume(self, volume: float) -> None: ...
-    def shutdown(self) -> None: ...
+sound = engine.load_wav("audio.wav")
+print(f"Длительность: {sound.duration:.2f} сек")
+print(f"Путь: {sound.path}")
+print(f"Формат: {sound.data.format.channels} каналов, {sound.data.format.sample_rate} Гц")
 ```
 
-This allows:
-- Testing with `NullBackend` (no actual audio output)
-- Future support for other backends (e.g., DirectSound, WASAPI)
-- Easy mocking in unit tests
+---
 
-## Limitations
+### 🎮 PlaybackHandle
 
-### Playback State Detection
+Уникальный идентификатор экземпляра воспроизведения. Используется для управления конкретным воспроизведением.
 
-**Current Implementation (Polling-based):**
+#### Пример
 
-The MVP uses a polling-based approach for detecting playback completion:
+```python
+handle1 = engine.play(sound1, volume=0.5)
+handle2 = engine.play(sound2, volume=0.8, pan=-0.3)
 
-- `is_playing()` checks voice state and elapsed time
-- For non-looping sounds, completion is detected by comparing elapsed time to sound duration
-- For looping sounds, `is_playing()` returns `True` until explicitly stopped
+# Независимое управление каждым воспроизведением
+engine.set_volume(handle1, 0.7)
+engine.set_pan(handle2, 0.5)
+```
 
-**Why not callbacks:**
+---
 
-XAudio2 supports callbacks through `IXAudio2VoiceCallback`, but implementing this in MVP would require:
-- Creating a Python callback function
-- Managing callback lifetime and thread safety
-- More complex COM interop
+## 🎼 Поддерживаемые форматы аудио
 
-This is marked as a TODO for future enhancement.
+### Форматы WAV
 
-**Workaround:**
+| Параметр | Поддерживаемые значения |
+|----------|------------------------|
+| **Формат** | PCM (fmt=1) |
+| **Разрядность** | 16-bit |
+| **Каналы** | Моно (1) или Стерео (2) |
+| **Частота дискретизации** | 44100 Гц или 48000 Гц |
 
-For applications that need event-driven completion detection, you can:
-1. Poll `is_playing()` in a loop
-2. Use threading to monitor playback state
-3. Calculate expected completion time and schedule actions
+**Неподдерживаемые форматы:**
 
-### Pan Implementation
+При попытке загрузить неподдерживаемый формат будет выброшено исключение `InvalidAudioFormat` с описанием проблемы.
 
-Panning is implemented using `SetOutputMatrix` for stereo output:
-- Simple left/right balance
-- For mono sources: pan affects both output channels
-- For stereo sources: pan adjusts the balance between left and right channels
+---
 
-More advanced panning (e.g., HRTF, 3D positioning) is not implemented in MVP.
+## 🏗️ Архитектура проекта
 
-### Format Support
+### Структура модулей
 
-Only WAV PCM 16-bit mono/stereo at 44100/48000 Hz is supported. Other formats will raise `InvalidAudioFormat`.
+```
+xaudio2py/
+├── 🎛️ api/                    # Публичный API
+│   ├── engine.py              # AudioEngine - основной интерфейс
+│   └── sound.py               # Sound, PlaybackHandle
+│
+├── 🔧 backends/               # Реализации бэкендов
+│   ├── __init__.py
+│   ├── null_backend.py        # Тестовый бэкенд (без аудио-вывода)
+│   └── xaudio2/               # XAudio2 бэкенд
+│       ├── backend.py         # Основная реализация
+│       ├── bindings.py        # ctypes структуры
+│       ├── com.py             # COM инициализация
+│       ├── dll.py             # Загрузка DLL
+│       ├── interfaces.py      # COM vtable декларации
+│       ├── utils.py           # Утилиты (HRESULT, pan-to-matrix)
+│       └── voices.py          # SourceVoice, MasteringVoice
+│
+├── 🧩 core/                   # Базовые абстракции
+│   ├── interfaces.py          # IAudioBackend, IVoice протоколы
+│   ├── models.py              # AudioFormat, VoiceParams, PlaybackState
+│   ├── exceptions.py          # XAudio2Error, InvalidAudioFormat
+│   └── thread.py              # Потокобезопасная очередь команд
+│
+├── 📄 formats/                # Парсеры форматов
+│   └── wav.py                 # Парсер WAV (RIFF/WAVE)
+│
+└── 🛠️ utils/                  # Вспомогательные модули
+    ├── log.py                 # Конфигурация логирования
+    └── validate.py            # Валидация входных данных
+```
 
-## Examples
+---
 
-See the `examples/` directory:
+## 🔄 Поток выполнения
 
-- `play_wav.py` - Basic playback example
-- `multi_play_demo.py` - Multiple simultaneous playbacks with controls
+### Инициализация
 
-## Testing
+```
+1. Создание AudioEngine
+   ↓
+2. Вызов engine.start()
+   ↓
+3. Инициализация COM (COINIT_MULTITHREADED)
+   ↓
+4. Загрузка xaudio2_9redist.dll
+   ↓
+5. Создание IXAudio2 через XAudio2Create
+   ↓
+6. Запуск XAudio2 движка (StartEngine)
+   ↓
+7. Создание MasteringVoice
+   ↓
+8. Запуск worker thread для команд
+```
 
-Run tests with pytest:
+### Воспроизведение звука
+
+```
+1. Загрузка файла (load_wav)
+   ↓
+2. Парсинг WAV (RIFF/WAVE заголовок)
+   ↓
+3. Извлечение PCM данных
+   ↓
+4. Вызов engine.play()
+   ↓
+5. Постановка команды в очередь worker thread
+   ↓
+6. Создание SourceVoice в worker thread
+   ↓
+7. Создание и отправка XAUDIO2_BUFFER
+   ↓
+8. Запуск воспроизведения (Start)
+```
+
+---
+
+## 🔧 Технические детали
+
+### COM интерфейсы
+
+Проект использует следующие COM интерфейсы:
+
+- **IXAudio2** — основной интерфейс XAudio2
+- **IXAudio2Voice** — базовый интерфейс для всех голосов
+- **IXAudio2SourceVoice** — интерфейс источника звука
+- **IXAudio2MasteringVoice** — интерфейс главного выхода
+
+#### VTable структура
+
+Все COM методы вызываются через vtable. Структуры vtable определены в `interfaces.py` с учётом наследования интерфейсов.
+
+**Пример структуры:**
+```python
+class IXAudio2SourceVoiceVtbl(Structure):
+    # 18 методов базового интерфейса IXAudio2Voice
+    ("GetVoiceDetails", c_void_p)
+    ("SetOutputVoices", c_void_p)
+    # ... остальные базовые методы ...
+    
+    # Методы IXAudio2SourceVoice
+    ("Start", c_void_p)
+    ("Stop", c_void_p)
+    ("SubmitSourceBuffer", c_void_p)
+    # ... остальные методы ...
+```
+
+### Управление памятью
+
+**Буферы аудио:**
+- PCM-данные хранятся в ctypes массивах (`c_uint8 * size`)
+- Массивы привязаны к объектам `SourceVoice` для предотвращения сборки мусора
+- Указатели на буферы передаются в XAudio2 через `XAUDIO2_BUFFER.pAudioData`
+
+**COM объекты:**
+- Счётчики ссылок управляются через `AddRef()` и `Release()`
+- Объекты освобождаются при вызове `engine.shutdown()`
+
+### Потокобезопасность
+
+- Все операции с XAudio2 выполняются в одном worker thread
+- Публичный API (`AudioEngine`) потокобезопасен
+- Команды ставятся в очередь и выполняются последовательно
+- Синхронные операции (например, `execute()`) ожидают завершения выполнения
+
+---
+
+## ⚙️ Конфигурация
+
+### Логирование
+
+По умолчанию логирование установлено на уровень `WARNING`. Для отладки:
+
+```python
+import logging
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+```
+
+Доступные уровни:
+- `DEBUG` — детальная отладочная информация
+- `INFO` — общая информация о работе
+- `WARNING` — предупреждения (по умолчанию)
+- `ERROR` — только ошибки
+
+---
+
+## 📝 Примеры использования
+
+### Пример 1: Простое воспроизведение
+
+```python
+from xaudio2py import AudioEngine
+
+engine = AudioEngine()
+engine.start()
+
+try:
+    sound = engine.load_wav("track.wav")
+    handle = engine.play(sound)
+    
+    # Ожидание завершения
+    import time
+    while engine.is_playing(handle):
+        time.sleep(0.1)
+finally:
+    engine.shutdown()
+```
+
+### Пример 2: Множественное воспроизведение
+
+```python
+from xaudio2py import AudioEngine
+
+engine = AudioEngine()
+engine.start()
+
+try:
+    sound1 = engine.load_wav("music.wav")
+    sound2 = engine.load_wav("effects.wav")
+    
+    # Фоновая музыка
+    music_handle = engine.play(sound1, volume=0.6, loop=True)
+    
+    # Звуковой эффект
+    effect_handle = engine.play(sound2, volume=0.9, pan=-0.8)
+    
+    # Ожидание завершения эффекта
+    import time
+    while engine.is_playing(effect_handle):
+        time.sleep(0.1)
+    
+    engine.stop(music_handle)
+finally:
+    engine.shutdown()
+```
+
+### Пример 3: Динамическое управление громкостью
+
+```python
+from xaudio2py import AudioEngine
+import time
+
+engine = AudioEngine()
+engine.start()
+
+try:
+    sound = engine.load_wav("fade.wav")
+    handle = engine.play(sound)
+    
+    # Плавное увеличение громкости
+    for vol in range(0, 101, 5):
+        engine.set_volume(handle, vol / 100.0)
+        time.sleep(0.1)
+    
+    # Плавное уменьшение громкости
+    for vol in range(100, -1, -5):
+        engine.set_volume(handle, vol / 100.0)
+        time.sleep(0.1)
+    
+    engine.stop(handle)
+finally:
+    engine.shutdown()
+```
+
+### Пример 4: Использование панорамирования
+
+```python
+from xaudio2py import AudioEngine
+import time
+
+engine = AudioEngine()
+engine.start()
+
+try:
+    sound = engine.load_wav("pan.wav")
+    handle = engine.play(sound, loop=True)
+    
+    # Движение звука слева направо
+    for pan in range(-10, 11):
+        engine.set_pan(handle, pan / 10.0)
+        time.sleep(0.2)
+    
+    engine.stop(handle)
+finally:
+    engine.shutdown()
+```
+
+Полные примеры доступны в директории `examples/`:
+- `play_wav.py` — базовое воспроизведение
+- `multi_play_demo.py` — множественное воспроизведение с управлением
+
+---
+
+## 🧪 Тестирование
+
+### Запуск тестов
 
 ```bash
 pytest tests/
 ```
 
-Tests use `NullBackend` to avoid requiring XAudio2 DLL and actual audio hardware.
+### Покрытие тестами
 
-## Error Handling
-
-The library raises specific exceptions:
-
-- `XAudio2Error(hresult, message)` - XAudio2/COM errors
-- `InvalidAudioFormat` - Unsupported audio format
-- `EngineNotStarted` - Operations attempted before `start()`
-- `PlaybackNotFound` - Invalid playback handle
-
-All HRESULT values are checked, and failures (< 0) raise `XAudio2Error`.
-
-## Logging
-
-The library uses Python's `logging` module. Set log level to see debug information:
-
-```python
-import logging
-logging.basicConfig(level=logging.DEBUG)
+```bash
+pytest --cov=src/xaudio2py tests/
 ```
 
-## Development
+### Структура тестов
 
-### Project Structure
+| Файл | Описание |
+|------|----------|
+| `test_engine_logic.py` | Тесты функциональности AudioEngine |
+| `test_thread_dispatch.py` | Тесты потокобезопасности и очереди команд |
+| `test_wav_parser.py` | Тесты парсера WAV-файлов |
+
+**Примечание:** Тесты используют `NullBackend` и не требуют наличия XAudio2 DLL или аудио-оборудования.
+
+---
+
+## ⚠️ Обработка ошибок
+
+### Типы исключений
+
+| Исключение | Причина | Пример |
+|-----------|---------|--------|
+| `XAudio2Error` | Ошибка XAudio2/COM | Неверный HRESULT при создании голоса |
+| `InvalidAudioFormat` | Неподдерживаемый формат | WAV с форматом, отличным от PCM |
+| `EngineNotStarted` | Операция до запуска движка | Вызов `play()` до `start()` |
+| `PlaybackNotFound` | Недействительный handle | Передача несуществующего `PlaybackHandle` |
+
+### Проверка HRESULT
+
+Все операции XAudio2 проверяют возвращаемый HRESULT:
+- `HRESULT >= 0` — успех
+- `HRESULT < 0` — ошибка, выбрасывается `XAudio2Error`
+
+**Формат ошибки:**
+```
+XAudio2 error (HRESULT: 0x88960001): CreateSourceVoice failed
+```
+
+### Пример обработки
+
+```python
+from xaudio2py import AudioEngine
+from xaudio2py.core.exceptions import XAudio2Error, InvalidAudioFormat
+
+engine = AudioEngine()
+engine.start()
+
+try:
+    sound = engine.load_wav("file.wav")
+    handle = engine.play(sound)
+except InvalidAudioFormat as e:
+    print(f"❌ Неподдерживаемый формат: {e}")
+except XAudio2Error as e:
+    print(f"❌ Ошибка XAudio2: {e}")
+    print(f"   HRESULT: 0x{e.hresult:08X}")
+finally:
+    engine.shutdown()
+```
+
+---
+
+## 🔍 Ограничения и особенности
+
+### Определение завершения воспроизведения
+
+**Текущая реализация (опрос состояния):**
+
+- `is_playing()` проверяет состояние голоса и прошедшее время
+- Для нециклических звуков завершение определяется сравнением времени
+- Для циклических звуков `is_playing()` возвращает `True` до явной остановки
+
+**Рекомендации:**
+- Используйте периодический опрос `is_playing()` в цикле
+- Для точного отслеживания используйте расчёт времени завершения
+
+### Панорамирование
+
+Панорамирование реализовано через `SetOutputMatrix`:
+- Простой баланс лево/право
+- Для моно-источников: панорама влияет на оба выходных канала
+- Для стерео-источников: панорама регулирует баланс между каналами
+
+### Поддержка форматов
+
+**Поддерживается:**
+- ✅ WAV PCM 16-bit
+- ✅ Моно (1 канал) и Стерео (2 канала)
+- ✅ Частоты дискретизации: 44100 Гц, 48000 Гц
+
+**Не поддерживается:**
+- ❌ Другие форматы (MP3, FLAC, OGG)
+- ❌ Другие разрядности (8-bit, 24-bit, 32-bit float)
+- ❌ Другие частоты дискретизации
+- ❌ Многоканальные форматы (> 2 каналов)
+
+---
+
+## 📦 Зависимости
+
+| Пакет | Версия | Назначение |
+|-------|--------|------------|
+| Python | ≥ 3.11 | Интерпретатор |
+| Windows | 10/11 | Операционная система |
+| XAudio2 DLL | 9 | Библиотека XAudio2 |
+
+**Внешние зависимости отсутствуют** — проект использует только стандартную библиотеку Python и ctypes.
+
+---
+
+## 🔨 Сборка и разработка
+
+### Структура проекта
 
 ```
 repo/
-  pyproject.toml
-  README.md
-  src/
-    xaudio2py/
-      __init__.py
-      api/              # Public API
-        engine.py
-        sound.py
-      core/             # Core abstractions
-        interfaces.py
-        models.py
-        exceptions.py
-        thread.py
-      formats/          # Format parsers
-        wav.py
-      backends/         # Backend implementations
-        null_backend.py
-        xaudio2/
-          dll.py
-          bindings.py
-          com.py
-          interfaces.py
-          backend.py
-          voices.py
-          utils.py
-      utils/
-        log.py
-        validate.py
-  tests/
-  examples/
+├── 📄 pyproject.toml          # Конфигурация проекта
+├── 📄 README.md               # Документация
+├── 📄 .gitignore              # Игнорируемые файлы
+│
+├── 📁 src/
+│   └── xaudio2py/             # Исходный код пакета
+│
+├── 📁 tests/                  # Тесты
+│
+├── 📁 examples/               # Примеры использования
+│
+└── 📁 bin/                    # XAudio2 DLL (не в репозитории)
 ```
 
-### Adding a New Backend
+### Сборка
 
-1. Implement `IAudioBackend` protocol
-2. Implement `IVoice` for voice control
-3. Register in `AudioEngine.__init__` (or use dependency injection)
+```bash
+# Установка в режиме разработки
+pip install -e .
 
-### Adding Format Support
+# Сборка wheel
+python -m build
+```
 
-1. Create parser in `formats/`
-2. Return `SoundData` with `AudioFormat`
-3. Update `AudioEngine.load_*` methods
+### Добавление нового бэкенда
 
-## License
+1. Создать класс, реализующий `IAudioBackend`
+2. Реализовать `IVoice` для управления голосами
+3. Зарегистрировать в `AudioEngine.__init__()` или использовать dependency injection
 
-MIT
+### Добавление поддержки формата
 
-## Contributing
+1. Создать парсер в `formats/`
+2. Возвращать `SoundData` с корректным `AudioFormat`
+3. Обновить методы `AudioEngine.load_*()`
 
-Contributions welcome! Please ensure:
-- Code follows SOLID principles
-- All tests pass
-- New features include tests
-- Documentation is updated
+---
 
+## 📄 Лицензия
+
+MIT License
+
+---
+
+## 🤝 Вклад в проект
+
+Вклады приветствуются! Пожалуйста:
+
+- ✅ Пишите код с учётом существующего стиля
+- ✅ Добавляйте тесты для новых функций
+- ✅ Обновляйте документацию
+- ✅ Проверяйте, что все тесты проходят
+
+---
+
+## 📞 Поддержка
+
+При возникновении проблем:
+
+1. Проверьте, что DLL установлена корректно
+2. Убедитесь, что формат файла поддерживается
+3. Проверьте логи (включите DEBUG уровень)
+4. Создайте issue с описанием проблемы и логами
+
+---
+
+**Версия:** 0.1.0  
+**Последнее обновление:** 2026
