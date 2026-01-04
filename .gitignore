@@ -150,6 +150,9 @@ cython_debug/
 *.ogg
 *.m4a
 
+# DLL files - allow xaudio2 DLLs in bin/ directory
+!bin/*.dll
+
 # Temporary files
 *.tmp
 *.temp
