@@ -4,7 +4,7 @@ import importlib
 import pkgutil
 from pathlib import Path
 from typing import Dict, Optional
-from xaudio2py.core.exceptions import InvalidAudioFormat
+from xaudio2py.core.exceptions import AudioFormatError, InvalidAudioFormat
 from xaudio2py.core.interfaces import IAudioFormat
 from xaudio2py.utils.log import get_logger
 
@@ -99,12 +99,12 @@ def load_audio(path: str):
         SoundData with format and PCM data.
         
     Raises:
-        InvalidAudioFormat: If no suitable format is found.
+        AudioFormatError: If no suitable format is found.
         FileNotFoundError: If file does not exist.
     """
     format = get_format_for_file(path)
     if format is None:
-        raise InvalidAudioFormat(
+        raise AudioFormatError(
             f"No suitable format handler found for file: {path}. "
             f"Supported extensions: {', '.join(sorted(set(ext for fmt in _format_registry.values() for ext in fmt.extensions)))}"
         )

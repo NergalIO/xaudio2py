@@ -3,7 +3,7 @@
 import struct
 from pathlib import Path
 from typing import BinaryIO
-from xaudio2py.core.exceptions import InvalidAudioFormat
+from xaudio2py.core.exceptions import AudioFormatError, InvalidAudioFormat
 from xaudio2py.core.interfaces import IAudioFormat
 from xaudio2py.core.models import AudioFormat, SoundData
 from xaudio2py.utils.log import get_logger

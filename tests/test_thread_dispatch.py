@@ -4,7 +4,7 @@ import threading
 import time
 import pytest
 from xaudio2py.backends.null_backend import NullBackend
-from xaudio2py.core.thread import BackendWorker
+from xaudio2py.concurrency.worker import BackendWorker
 
 
 def test_worker_start_stop():

@@ -5,7 +5,7 @@ import sys
 from ctypes import WinDLL, c_void_p, POINTER, Structure
 from pathlib import Path
 from typing import Optional, Tuple
-from xaudio2py.core.exceptions import XAudio2Error
+from xaudio2py.core.exceptions import BackendError, XAudio2Error
 from xaudio2py.utils.log import get_logger
 
 logger = get_logger(__name__)
@@ -35,7 +35,7 @@ class XAudio2DLL:
             Tuple of (WinDLL instance, DLL path).
 
         Raises:
-            XAudio2Error: If DLL cannot be loaded or functions not found.
+            BackendError: If DLL cannot be loaded or functions not found.
         """
         if self._dll is not None:
             return self._dll, self._dll_path
@@ -43,27 +43,27 @@ class XAudio2DLL:
         # Try to find DLL
         dll_path = self._find_dll()
         if dll_path is None:
-            raise XAudio2Error(
-                0x80070002,  # ERROR_FILE_NOT_FOUND
+            raise BackendError(
                 f"XAudio2 DLL not found. Tried: {', '.join(DLL_NAMES)}",
+                hresult=0x80070002,  # ERROR_FILE_NOT_FOUND
             )
 
         # Load DLL
         try:
             dll = WinDLL(dll_path)
         except OSError as e:
-            raise XAudio2Error(
-                0x80070005,  # ERROR_ACCESS_DENIED
+            raise BackendError(
                 f"Failed to load {dll_path}: {e}",
+                hresult=0x80070005,  # ERROR_ACCESS_DENIED
             )
 
         # Resolve XAudio2Create
         try:
             XAudio2Create = dll.XAudio2Create
         except AttributeError:
-            raise XAudio2Error(
-                0x80070002,  # ERROR_FILE_NOT_FOUND
+            raise BackendError(
                 f"XAudio2Create not found in {dll_path}",
+                hresult=0x80070002,  # ERROR_FILE_NOT_FOUND
             )
 
         # Set function signature

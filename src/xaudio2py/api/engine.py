@@ -1,17 +1,14 @@
-"""AudioEngine - main public API."""
+"""AudioEngine - main public API facade."""
 
-import time
-import uuid
-from typing import Dict, Optional
-from xaudio2py.api.sound import Sound, PlaybackHandle
-from xaudio2py.backends.null_backend import NullBackend
-from xaudio2py.core.exceptions import EngineNotStarted, PlaybackNotFound
+from typing import Optional
+from xaudio2py.api.sound import PlaybackHandle, Sound
+from xaudio2py.core.exceptions import EngineNotStartedError
 from xaudio2py.core.interfaces import IAudioBackend
-from xaudio2py.core.models import EngineConfig, PlaybackState, VoiceParams
-from xaudio2py.core.thread import BackendWorker
+from xaudio2py.core.models import EngineConfig
 from xaudio2py.formats import load_audio
+from xaudio2py.services.engine_lifecycle import EngineLifecycleService
+from xaudio2py.services.playback import PlaybackService
 from xaudio2py.utils.log import get_logger
-from xaudio2py.utils.validate import validate_pan, validate_volume
 
 logger = get_logger(__name__)
 
@@ -19,13 +16,27 @@ logger = get_logger(__name__)
 class AudioEngine:
     """
     Main audio engine facade.
-
-    Provides a high-level API for audio playback with thread-safe operations.
-    All XAudio2 operations are executed in a dedicated worker thread.
+    
+    This class provides a high-level API for audio playback and acts as a facade
+    that delegates all operations to specialized services:
+    - EngineLifecycleService: Manages engine lifecycle
+    - PlaybackService: Manages playback operations
+    
+    Responsibilities:
+    - Provide simple, unified API
+    - Delegate to services
+    - Maintain backward compatibility
+    
+    This class does NOT:
+    - Manage threads directly
+    - Store playback state
+    - Execute backend operations
     """
 
     def __init__(
-        self, config: EngineConfig = EngineConfig(), backend: Optional[IAudioBackend] = None
+        self,
+        config: EngineConfig = EngineConfig(),
+        backend: Optional[IAudioBackend] = None,
     ):
         """
         Initialize AudioEngine.
@@ -35,48 +46,50 @@ class AudioEngine:
             backend: Optional backend implementation (default: XAudio2Backend).
         """
         self._config = config
-        self._backend = backend
-        if self._backend is None:
+        
+        # Initialize backend if not provided
+        if backend is None:
             # Lazy import to avoid loading XAudio2 DLL on import
             from xaudio2py.backends.xaudio2.backend import XAudio2Backend
-            self._backend = XAudio2Backend()
-
-        self._worker: Optional[BackendWorker] = None
-        self._started = False
-        self._playbacks: Dict[str, PlaybackInfo] = {}
+            backend = XAudio2Backend()
+        
+        # Initialize services
+        self._lifecycle_service = EngineLifecycleService(backend, config)
+        self._playback_service: Optional[PlaybackService] = None
 
     def start(self) -> None:
-        """Start the audio engine."""
-        if self._started:
-            return
-
-        self._worker = BackendWorker(self._backend)
-        self._worker.start()
-        self._started = True
+        """
+        Start the audio engine.
+        
+        Raises:
+            RuntimeError: If engine fails to start.
+        """
+        self._lifecycle_service.start()
+        
+        # Initialize playback service after lifecycle is started
+        worker = self._lifecycle_service.worker
+        backend = self._lifecycle_service.backend
+        self._playback_service = PlaybackService(worker, backend)
+        
         logger.info("AudioEngine started")
 
     def shutdown(self) -> None:
-        """Shutdown the audio engine and free all resources."""
-        if not self._started:
-            return
-
-        logger.info("Shutting down AudioEngine...")
-
-        # Stop all playbacks
-        for handle_id in list(self._playbacks.keys()):
+        """
+        Shutdown the audio engine and free all resources.
+        
+        This method is idempotent and safe to call multiple times.
+        """
+        # Stop all playbacks first
+        if self._playback_service is not None:
             try:
-                self.stop(PlaybackHandle(handle_id))
+                self._playback_service.stop_all()
             except Exception as e:
-                logger.warning(f"Error stopping playback {handle_id}: {e}")
-
-        # Shutdown backend
-        if self._worker is not None:
-            self._worker.execute(self._backend.shutdown)
-            self._worker.stop()
-            self._worker = None
-
-        self._playbacks.clear()
-        self._started = False
+                logger.warning(f"Error stopping all playbacks during shutdown: {e}")
+        
+        # Shutdown lifecycle service
+        self._lifecycle_service.shutdown()
+        self._playback_service = None
+        
         logger.info("AudioEngine shut down")
 
     def load(self, path: str) -> Sound:
@@ -95,7 +108,7 @@ class AudioEngine:
 
         Raises:
             FileNotFoundError: If file does not exist.
-            InvalidAudioFormat: If format is not supported or cannot be decoded.
+            AudioFormatError: If format is not supported or cannot be decoded.
         """
         data = load_audio(path)
         return Sound(data, path)
@@ -121,40 +134,12 @@ class AudioEngine:
             PlaybackHandle for controlling playback.
 
         Raises:
-            EngineNotStarted: If engine is not started.
+            EngineNotStartedError: If engine is not started.
         """
-        if not self._started:
-            raise EngineNotStarted("Engine must be started before playing sounds")
-
-        volume = validate_volume(volume)
-        pan = validate_pan(pan)
-
-        # Create voice in worker thread
-        params = VoiceParams(volume=volume, pan=pan, loop=loop)
-        # Create voice and start playback (start is called inside create_source_voice)
-        voice = self._worker.execute(
-            lambda: self._backend.create_source_voice(
-                sound.data.format, sound.data.data, params
-            )
-        )
+        if self._playback_service is None:
+            raise EngineNotStartedError("Engine must be started before playing sounds")
         
-        # Set start_time after voice is created and started
-        start_time = time.monotonic()
-
-        # Create handle and track playback
-        handle_id = str(uuid.uuid4())
-        handle = PlaybackHandle(handle_id)
-        playback_info = PlaybackInfo(
-            handle=handle,
-            voice=voice,
-            sound=sound,
-            params=params,
-            start_time=start_time,
-        )
-        self._playbacks[handle_id] = playback_info
-
-        logger.debug(f"Started playback {handle_id}")
-        return handle
+        return self._playback_service.start_playback(sound, volume=volume, pan=pan, loop=loop)
 
     def stop(self, handle: PlaybackHandle) -> None:
         """
@@ -164,19 +149,13 @@ class AudioEngine:
             handle: Playback handle.
 
         Raises:
-            EngineNotStarted: If engine is not started.
-            PlaybackNotFound: If handle is invalid.
+            EngineNotStartedError: If engine is not started.
+            PlaybackNotFoundError: If handle is invalid.
         """
-        if not self._started:
-            raise EngineNotStarted("Engine not started")
-
-        playback_info = self._playbacks.get(handle.id)
-        if playback_info is None:
-            raise PlaybackNotFound(f"Playback handle not found: {handle.id}")
-
-        self._worker.execute(playback_info.voice.stop)
-        del self._playbacks[handle.id]
-        logger.debug(f"Stopped playback {handle.id}")
+        if self._playback_service is None:
+            raise EngineNotStartedError("Engine not started")
+        
+        self._playback_service.stop_playback(handle)
 
     def pause(self, handle: PlaybackHandle) -> None:
         """
@@ -186,18 +165,13 @@ class AudioEngine:
             handle: Playback handle.
 
         Raises:
-            EngineNotStarted: If engine is not started.
-            PlaybackNotFound: If handle is invalid.
+            EngineNotStartedError: If engine is not started.
+            PlaybackNotFoundError: If handle is invalid.
         """
-        if not self._started:
-            raise EngineNotStarted("Engine not started")
-
-        playback_info = self._playbacks.get(handle.id)
-        if playback_info is None:
-            raise PlaybackNotFound(f"Playback handle not found: {handle.id}")
-
-        self._worker.execute(playback_info.voice.pause)
-        logger.debug(f"Paused playback {handle.id}")
+        if self._playback_service is None:
+            raise EngineNotStartedError("Engine not started")
+        
+        self._playback_service.pause_playback(handle)
 
     def resume(self, handle: PlaybackHandle) -> None:
         """
@@ -207,18 +181,13 @@ class AudioEngine:
             handle: Playback handle.
 
         Raises:
-            EngineNotStarted: If engine is not started.
-            PlaybackNotFound: If handle is invalid.
+            EngineNotStartedError: If engine is not started.
+            PlaybackNotFoundError: If handle is invalid.
         """
-        if not self._started:
-            raise EngineNotStarted("Engine not started")
-
-        playback_info = self._playbacks.get(handle.id)
-        if playback_info is None:
-            raise PlaybackNotFound(f"Playback handle not found: {handle.id}")
-
-        self._worker.execute(playback_info.voice.resume)
-        logger.debug(f"Resumed playback {handle.id}")
+        if self._playback_service is None:
+            raise EngineNotStartedError("Engine not started")
+        
+        self._playback_service.resume_playback(handle)
 
     def set_volume(self, handle: PlaybackHandle, volume: float) -> None:
         """
@@ -229,19 +198,13 @@ class AudioEngine:
             volume: Volume (0.0 to 1.0).
 
         Raises:
-            EngineNotStarted: If engine is not started.
-            PlaybackNotFound: If handle is invalid.
+            EngineNotStartedError: If engine is not started.
+            PlaybackNotFoundError: If handle is invalid.
         """
-        if not self._started:
-            raise EngineNotStarted("Engine not started")
-
-        playback_info = self._playbacks.get(handle.id)
-        if playback_info is None:
-            raise PlaybackNotFound(f"Playback handle not found: {handle.id}")
-
-        volume = validate_volume(volume)
-        self._worker.execute(lambda: playback_info.voice.set_volume(volume))
-        playback_info.params.volume = volume
+        if self._playback_service is None:
+            raise EngineNotStartedError("Engine not started")
+        
+        self._playback_service.set_volume(handle, volume)
 
     def set_pan(self, handle: PlaybackHandle, pan: float) -> None:
         """
@@ -252,19 +215,13 @@ class AudioEngine:
             pan: Pan (-1.0 left, 0.0 center, 1.0 right).
 
         Raises:
-            EngineNotStarted: If engine is not started.
-            PlaybackNotFound: If handle is invalid.
+            EngineNotStartedError: If engine is not started.
+            PlaybackNotFoundError: If handle is invalid.
         """
-        if not self._started:
-            raise EngineNotStarted("Engine not started")
-
-        playback_info = self._playbacks.get(handle.id)
-        if playback_info is None:
-            raise PlaybackNotFound(f"Playback handle not found: {handle.id}")
-
-        pan = validate_pan(pan)
-        self._worker.execute(lambda: playback_info.voice.set_pan(pan))
-        playback_info.params.pan = pan
+        if self._playback_service is None:
+            raise EngineNotStartedError("Engine not started")
+        
+        self._playback_service.set_pan(handle, pan)
 
     def set_master_volume(self, volume: float) -> None:
         """
@@ -274,13 +231,17 @@ class AudioEngine:
             volume: Volume (0.0 to 1.0).
 
         Raises:
-            EngineNotStarted: If engine is not started.
+            EngineNotStartedError: If engine is not started.
         """
-        if not self._started:
-            raise EngineNotStarted("Engine not started")
-
+        if not self._lifecycle_service.is_started:
+            raise EngineNotStartedError("Engine not started")
+        
+        from xaudio2py.utils.validate import validate_volume
         volume = validate_volume(volume)
-        self._worker.execute(lambda: self._backend.set_master_volume(volume))
+        
+        worker = self._lifecycle_service.worker
+        backend = self._lifecycle_service.backend
+        worker.execute(lambda: backend.set_master_volume(volume))
 
     def is_playing(self, handle: PlaybackHandle) -> bool:
         """
@@ -293,35 +254,12 @@ class AudioEngine:
             True if playing, False otherwise.
 
         Raises:
-            EngineNotStarted: If engine is not started.
-            PlaybackNotFound: If handle is invalid.
+            EngineNotStartedError: If engine is not started.
         """
-        if not self._started:
-            raise EngineNotStarted("Engine not started")
-
-        playback_info = self._playbacks.get(handle.id)
-        if playback_info is None:
-            logger.debug(f"is_playing: handle {handle.id} not found")
-            return False
-
-        # Get state from voice
-        state = self._worker.execute(playback_info.voice.get_state)
+        if self._playback_service is None:
+            raise EngineNotStartedError("Engine not started")
         
-        elapsed = time.monotonic() - playback_info.start_time
-        logger.info(
-            f"is_playing: handle={handle.id}, state={state}, "
-            f"elapsed={elapsed:.3f}s"
-        )
-
-        # Also check time-based completion for non-looping sounds
-        if state == PlaybackState.PLAYING and not playback_info.params.loop:
-            if elapsed >= playback_info.sound.duration:
-                logger.info(f"is_playing: playback completed (duration {elapsed:.3f}s >= {playback_info.sound.duration:.3f}s)")
-                return False
-
-        result = state == PlaybackState.PLAYING
-        logger.info(f"is_playing: returning {result}")
-        return result
+        return self._playback_service.is_playing(handle)
 
     def __enter__(self):
         """Context manager entry."""
@@ -331,22 +269,3 @@ class AudioEngine:
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Context manager exit."""
         self.shutdown()
-
-
-class PlaybackInfo:
-    """Internal playback tracking information."""
-
-    def __init__(
-        self,
-        handle: PlaybackHandle,
-        voice,
-        sound: Sound,
-        params: VoiceParams,
-        start_time: float,
-    ):
-        self.handle = handle
-        self.voice = voice
-        self.sound = sound
-        self.params = params
-        self.start_time = start_time
-

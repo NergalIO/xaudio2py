@@ -1,7 +1,7 @@
 """Utility functions for XAudio2 backend."""
 
 from ctypes import c_int32
-from xaudio2py.core.exceptions import XAudio2Error
+from xaudio2py.core.exceptions import BackendError, XAudio2Error
 from xaudio2py.utils.log import get_logger
 
 logger = get_logger(__name__)
@@ -29,7 +29,7 @@ def hrcheck(hresult: int, message: str = "") -> None:
         message: Optional error message.
 
     Raises:
-        XAudio2Error: If HRESULT indicates failure (< 0).
+        BackendError: If HRESULT indicates failure (< 0).
     """
     # HRESULT is signed 32-bit integer
     # Success codes are >= 0, failure codes are < 0
@@ -41,7 +41,7 @@ def hrcheck(hresult: int, message: str = "") -> None:
         hresult = c_int32(hresult).value
     
     if hresult < 0:
-        raise XAudio2Error(hresult, f"{message} (HRESULT: {hr_to_hex(hresult)})")
+        raise BackendError(f"{message} (HRESULT: {hr_to_hex(hresult)})", hresult=hresult)
 
 
 def safe_call(func, *args, error_message: str = "", **kwargs):
@@ -58,7 +58,7 @@ def safe_call(func, *args, error_message: str = "", **kwargs):
         Function result.
 
     Raises:
-        XAudio2Error: If HRESULT indicates failure.
+        BackendError: If HRESULT indicates failure.
     """
     hresult = func(*args, **kwargs)
     hrcheck(hresult, error_message)

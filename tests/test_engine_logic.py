@@ -32,18 +32,18 @@ def test_engine_start_shutdown():
     engine = AudioEngine(backend=backend)
 
     engine.start()
-    assert engine._started
+    assert engine._lifecycle_service.is_started
 
     engine.shutdown()
-    assert not engine._started
+    assert not engine._lifecycle_service.is_started
 
 
 def test_engine_context_manager():
     """Test engine as context manager."""
     backend = NullBackend()
     with AudioEngine(backend=backend) as engine:
-        assert engine._started
-    assert not engine._started
+        assert engine._lifecycle_service.is_started
+    assert not engine._lifecycle_service.is_started
 
 
 def test_play_before_start():
@@ -65,10 +65,12 @@ def test_play_stop():
     sound = create_test_sound()
     handle = engine.play(sound)
 
-    assert handle.id in engine._playbacks
+    # Check that playback is registered
+    assert engine._playback_service.registry.get(handle) is not None
 
     engine.stop(handle)
-    assert handle.id not in engine._playbacks
+    # Check that playback is removed
+    assert engine._playback_service.registry.get(handle) is None
 
 
 def test_play_pause_resume():
@@ -201,4 +203,3 @@ def test_pan_validation():
 
     engine.set_pan(handle, -2.0)  # Should be clamped to -1.0
     engine.stop(handle)
-

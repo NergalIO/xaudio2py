@@ -10,6 +10,13 @@ from xaudio2py.api.engine import AudioEngine
 from xaudio2py.api.sound import Sound, PlaybackHandle
 from xaudio2py.core.models import EngineConfig, PlaybackState
 from xaudio2py.core.exceptions import (
+    # New exception names
+    AudioEngineError,
+    EngineNotStartedError,
+    PlaybackNotFoundError,
+    BackendError,
+    AudioFormatError,
+    # Backward compatibility aliases
     XAudio2Error,
     InvalidAudioFormat,
     EngineNotStarted,
@@ -24,6 +31,13 @@ __all__ = [
     "PlaybackHandle",
     "EngineConfig",
     "PlaybackState",
+    # New exception names
+    "AudioEngineError",
+    "EngineNotStartedError",
+    "PlaybackNotFoundError",
+    "BackendError",
+    "AudioFormatError",
+    # Backward compatibility aliases
     "XAudio2Error",
     "InvalidAudioFormat",
     "EngineNotStarted",

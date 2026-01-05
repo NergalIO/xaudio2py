@@ -6,29 +6,40 @@ def hr_to_hex(hr: int) -> str:
     return f"0x{(hr & 0xFFFFFFFF):08X}"
 
 
-class XAudio2Error(Exception):
-    """Base exception for XAudio2-related errors."""
+class AudioEngineError(Exception):
+    """Base exception for audio engine errors."""
+    pass
 
-    def __init__(self, hresult: int, message: str = ""):
+
+class EngineNotStartedError(AudioEngineError):
+    """Raised when engine operations are attempted before start()."""
+    pass
+
+
+class PlaybackNotFoundError(AudioEngineError):
+    """Raised when a playback handle is invalid or not found."""
+    pass
+
+
+class BackendError(AudioEngineError):
+    """Raised when backend operation fails."""
+    
+    def __init__(self, message: str, hresult: int = 0):
         self.hresult = hresult
         self.message = message
-        super().__init__(f"XAudio2 error (HRESULT: {hr_to_hex(hresult)}): {message}")
+        if hresult != 0:
+            super().__init__(f"Backend error (HRESULT: {hr_to_hex(hresult)}): {message}")
+        else:
+            super().__init__(f"Backend error: {message}")
 
 
-class InvalidAudioFormat(Exception):
-    """Raised when audio format is not supported."""
-
+class AudioFormatError(AudioEngineError):
+    """Raised when audio format is not supported or cannot be decoded."""
     pass
 
 
-class EngineNotStarted(Exception):
-    """Raised when engine operations are attempted before start()."""
-
-    pass
-
-
-class PlaybackNotFound(Exception):
-    """Raised when a playback handle is invalid or not found."""
-
-    pass
-
+# Backward compatibility aliases
+XAudio2Error = BackendError
+InvalidAudioFormat = AudioFormatError
+EngineNotStarted = EngineNotStartedError
+PlaybackNotFound = PlaybackNotFoundError
