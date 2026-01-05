@@ -25,7 +25,7 @@ if __name__ == "__main__":
 
         # Load WAV file
         print(f"Loading {wav_path}...")
-        sound = engine.load_wav(wav_path)
+        sound = engine.load(wav_path)
         print(f"Loaded: {sound.duration:.2f} seconds")
 
         # Play sound

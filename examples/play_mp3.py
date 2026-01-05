@@ -26,7 +26,7 @@ if __name__ == "__main__":
         # Load MP3 file
         print(f"Loading {mp3_path}...")
         try:
-            sound = engine.load_mp3(mp3_path)
+            sound = engine.load(mp3_path)
             print(f"Loaded: {sound.duration:.2f} seconds")
         except ImportError as e:
             print(f"Error: {e}")

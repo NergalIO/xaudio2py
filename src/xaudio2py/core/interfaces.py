@@ -77,3 +77,45 @@ class IBackendWorker(Protocol):
         """Execute a command in the worker thread and return result."""
         ...
 
+
+class IAudioFormat(Protocol):
+    """Interface for audio format parsers."""
+
+    @property
+    def extensions(self) -> tuple[str, ...]:
+        """
+        File extensions supported by this format (e.g., ('.wav', '.wave')).
+        
+        Returns:
+            Tuple of supported file extensions (lowercase, with dot).
+        """
+        ...
+
+    def can_load(self, path: str) -> bool:
+        """
+        Check if this format can load the given file.
+        
+        Args:
+            path: Path to audio file.
+            
+        Returns:
+            True if this format can load the file, False otherwise.
+        """
+        ...
+
+    def load(self, path: str) -> SoundData:
+        """
+        Load an audio file and return SoundData.
+        
+        Args:
+            path: Path to audio file.
+            
+        Returns:
+            SoundData with format and PCM data.
+            
+        Raises:
+            InvalidAudioFormat: If format is not supported.
+            FileNotFoundError: If file does not exist.
+            IOError: If file cannot be read.
+        """
+        ...

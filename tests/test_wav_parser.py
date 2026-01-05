@@ -4,7 +4,8 @@ import io
 import struct
 import pytest
 from xaudio2py.core.exceptions import InvalidAudioFormat
-from xaudio2py.formats.wav import _parse_wav, load_wav
+from xaudio2py.formats.wav import _parse_wav, wav_format
+from xaudio2py.formats import load_audio
 from pathlib import Path
 import tempfile
 
@@ -111,7 +112,7 @@ def test_load_wav_from_file():
         temp_path = f.name
 
     try:
-        sound_data = load_wav(temp_path)
+        sound_data = load_audio(temp_path)
         assert sound_data.format.sample_rate == 44100
     finally:
         Path(temp_path).unlink()
@@ -120,5 +121,5 @@ def test_load_wav_from_file():
 def test_load_wav_file_not_found():
     """Test loading non-existent WAV file."""
     with pytest.raises(FileNotFoundError):
-        load_wav("nonexistent.wav")
+        wav_format.load("nonexistent.wav")
 

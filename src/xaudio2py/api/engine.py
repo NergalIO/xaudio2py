@@ -9,8 +9,7 @@ from xaudio2py.core.exceptions import EngineNotStarted, PlaybackNotFound
 from xaudio2py.core.interfaces import IAudioBackend
 from xaudio2py.core.models import EngineConfig, PlaybackState, VoiceParams
 from xaudio2py.core.thread import BackendWorker
-from xaudio2py.formats.wav import load_wav
-from xaudio2py.formats.mp3 import load_mp3
+from xaudio2py.formats import load_audio
 from xaudio2py.utils.log import get_logger
 from xaudio2py.utils.validate import validate_pan, validate_volume
 
@@ -80,43 +79,25 @@ class AudioEngine:
         self._started = False
         logger.info("AudioEngine shut down")
 
-    def load_wav(self, path: str) -> Sound:
+    def load(self, path: str) -> Sound:
         """
-        Load a WAV file.
+        Automatically detect and load an audio file.
+
+        Supports all registered audio formats (WAV, MP3, etc.).
+        The format is automatically detected based on file extension
+        and file header.
 
         Args:
-            path: Path to WAV file.
+            path: Path to audio file.
 
         Returns:
             Sound object.
 
         Raises:
             FileNotFoundError: If file does not exist.
-            InvalidAudioFormat: If format is not supported.
+            InvalidAudioFormat: If format is not supported or cannot be decoded.
         """
-        data = load_wav(path)
-        return Sound(data, path)
-
-    def load_mp3(self, path: str) -> Sound:
-        """
-        Load an MP3 file.
-
-        MP3 files are automatically converted to 16-bit PCM format
-        compatible with XAudio2. Supports automatic resampling to
-        44100 or 48000 Hz if needed.
-
-        Args:
-            path: Path to MP3 file.
-
-        Returns:
-            Sound object.
-
-        Raises:
-            FileNotFoundError: If file does not exist.
-            InvalidAudioFormat: If format cannot be decoded.
-            ImportError: If pydub is not installed.
-        """
-        data = load_mp3(path)
+        data = load_audio(path)
         return Sound(data, path)
 
     def play(
@@ -156,6 +137,9 @@ class AudioEngine:
                 sound.data.format, sound.data.data, params
             )
         )
+        
+        # Set start_time after voice is created and started
+        start_time = time.monotonic()
 
         # Create handle and track playback
         handle_id = str(uuid.uuid4())
@@ -165,7 +149,7 @@ class AudioEngine:
             voice=voice,
             sound=sound,
             params=params,
-            start_time=time.monotonic(),
+            start_time=start_time,
         )
         self._playbacks[handle_id] = playback_info
 

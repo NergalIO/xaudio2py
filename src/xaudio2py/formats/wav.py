@@ -4,39 +4,70 @@ import struct
 from pathlib import Path
 from typing import BinaryIO
 from xaudio2py.core.exceptions import InvalidAudioFormat
+from xaudio2py.core.interfaces import IAudioFormat
 from xaudio2py.core.models import AudioFormat, SoundData
 from xaudio2py.utils.log import get_logger
 
 logger = get_logger(__name__)
 
 
-def load_wav(path: str) -> SoundData:
-    """
-    Load a WAV file and return SoundData.
+class WavFormat(IAudioFormat):
+    """WAV format parser implementing IAudioFormat."""
 
-    Supports:
-    - PCM format (fmt=1)
-    - 16-bit samples
-    - Mono or stereo
-    - 44100 or 48000 Hz sample rate
+    @property
+    def extensions(self) -> tuple[str, ...]:
+        """Supported file extensions."""
+        return (".wav", ".wave")
 
-    Args:
-        path: Path to WAV file.
+    def can_load(self, path: str) -> bool:
+        """Check if file can be loaded as WAV."""
+        path_obj = Path(path)
+        if not path_obj.exists():
+            return False
+        
+        # Check extension
+        if path_obj.suffix.lower() not in self.extensions:
+            return False
+        
+        # Check file header (RIFF WAVE)
+        try:
+            with open(path_obj, "rb") as f:
+                riff = f.read(4)
+                if riff != b"RIFF":
+                    return False
+                f.seek(8)  # Skip file size
+                wave = f.read(4)
+                return wave == b"WAVE"
+        except Exception:
+            return False
 
-    Returns:
-        SoundData with format and PCM data.
+    def load(self, path: str) -> SoundData:
+        """
+        Load a WAV file and return SoundData.
 
-    Raises:
-        InvalidAudioFormat: If format is not supported.
-        FileNotFoundError: If file does not exist.
-        IOError: If file cannot be read.
-    """
-    path_obj = Path(path)
-    if not path_obj.exists():
-        raise FileNotFoundError(f"WAV file not found: {path}")
+        Supports:
+        - PCM format (fmt=1)
+        - 16-bit samples
+        - Mono or stereo
+        - 44100 or 48000 Hz sample rate
 
-    with open(path_obj, "rb") as f:
-        return _parse_wav(f)
+        Args:
+            path: Path to WAV file.
+
+        Returns:
+            SoundData with format and PCM data.
+
+        Raises:
+            InvalidAudioFormat: If format is not supported.
+            FileNotFoundError: If file does not exist.
+            IOError: If file cannot be read.
+        """
+        path_obj = Path(path)
+        if not path_obj.exists():
+            raise FileNotFoundError(f"WAV file not found: {path}")
+
+        with open(path_obj, "rb") as f:
+            return _parse_wav(f)
 
 
 def _parse_wav(f: BinaryIO) -> SoundData:
@@ -136,3 +167,6 @@ def _parse_wav(f: BinaryIO) -> SoundData:
         duration_seconds=duration_seconds,
     )
 
+
+# Format instance for automatic registration
+wav_format = WavFormat()

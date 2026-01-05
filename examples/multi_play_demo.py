@@ -27,7 +27,7 @@ if __name__ == "__main__":
             if not Path(wav_path).exists():
                 print(f"Warning: File not found: {wav_path}, skipping")
                 continue
-            sound = engine.load_wav(wav_path)
+            sound = engine.load(wav_path)
             sounds.append(sound)
             print(f"Loaded: {wav_path} ({sound.duration:.2f}s)")
 

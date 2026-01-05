@@ -104,6 +104,7 @@ class NullBackend(IAudioBackend):
         self._next_voice_id += 1
         voice = NullVoice(voice_id, format, data, params)
         self._voices[voice_id] = voice
+        voice.start()  # Start playback immediately, like XAudio2Backend does
         logger.debug(f"Created NullVoice {voice_id}")
         return voice
 
