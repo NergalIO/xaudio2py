@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "MIT"}
 authors = [
-    {name = "xaudio2py contributors"}
+    {name = "NergalIO"}
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -24,6 +24,9 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
+mp3 = [
+    "pydub>=0.25.0",
+]
 dev = [
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",

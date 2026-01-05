@@ -10,6 +10,7 @@ from xaudio2py.core.interfaces import IAudioBackend
 from xaudio2py.core.models import EngineConfig, PlaybackState, VoiceParams
 from xaudio2py.core.thread import BackendWorker
 from xaudio2py.formats.wav import load_wav
+from xaudio2py.formats.mp3 import load_mp3
 from xaudio2py.utils.log import get_logger
 from xaudio2py.utils.validate import validate_pan, validate_volume
 
@@ -94,6 +95,28 @@ class AudioEngine:
             InvalidAudioFormat: If format is not supported.
         """
         data = load_wav(path)
+        return Sound(data, path)
+
+    def load_mp3(self, path: str) -> Sound:
+        """
+        Load an MP3 file.
+
+        MP3 files are automatically converted to 16-bit PCM format
+        compatible with XAudio2. Supports automatic resampling to
+        44100 or 48000 Hz if needed.
+
+        Args:
+            path: Path to MP3 file.
+
+        Returns:
+            Sound object.
+
+        Raises:
+            FileNotFoundError: If file does not exist.
+            InvalidAudioFormat: If format cannot be decoded.
+            ImportError: If pydub is not installed.
+        """
+        data = load_mp3(path)
         return Sound(data, path)
 
     def play(
